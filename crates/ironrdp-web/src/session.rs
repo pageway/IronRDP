@@ -79,6 +79,7 @@ struct SessionBuilderInner {
     set_cursor_style_callback_context: Option<JsValue>,
     remote_clipboard_changed_callback: Option<js_sys::Function>,
     force_clipboard_update_callback: Option<js_sys::Function>,
+    canvas_resized_callback: Option<js_sys::Function>,
     // File transfer callbacks
     files_available_callback: Option<js_sys::Function>,
     file_contents_request_callback: Option<js_sys::Function>,
@@ -129,6 +130,7 @@ impl Default for SessionBuilderInner {
             set_cursor_style_callback_context: None,
             remote_clipboard_changed_callback: None,
             force_clipboard_update_callback: None,
+            canvas_resized_callback: None,
             files_available_callback: None,
             file_contents_request_callback: None,
             file_contents_response_callback: None,
@@ -283,8 +285,9 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
         self.clone()
     }
 
-    /// Because the server does not resize the framebuffer in the RDP protocol, this feature is unused in IronRDP.
-    fn canvas_resized_callback(&self, _callback: js_sys::Function) -> Self {
+    /// Optional
+    fn canvas_resized_callback(&self, callback: js_sys::Function) -> Self {
+        self.0.borrow_mut().canvas_resized_callback = Some(callback);
         self.clone()
     }
 
@@ -409,6 +412,7 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
             set_cursor_style_callback_context,
             remote_clipboard_changed_callback,
             force_clipboard_update_callback,
+            canvas_resized_callback,
             files_available_callback,
             file_contents_request_callback,
             file_contents_response_callback,
@@ -454,6 +458,7 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
                 .context("set_cursor_style_callback_context missing")?;
             remote_clipboard_changed_callback = inner.remote_clipboard_changed_callback.clone();
             force_clipboard_update_callback = inner.force_clipboard_update_callback.clone();
+            canvas_resized_callback = inner.canvas_resized_callback.clone();
             files_available_callback = inner.files_available_callback.clone();
             file_contents_request_callback = inner.file_contents_request_callback.clone();
             file_contents_response_callback = inner.file_contents_response_callback.clone();
@@ -613,6 +618,7 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
             render_canvas,
             set_cursor_style_callback,
             set_cursor_style_callback_context,
+            canvas_resized_callback,
 
             input_events_rx: RefCell::new(Some(input_events_rx)),
             rdp_reader: RefCell::new(Some(rdp_reader)),
@@ -661,6 +667,7 @@ pub(crate) struct Session {
     render_canvas: HtmlCanvasElement,
     set_cursor_style_callback: js_sys::Function,
     set_cursor_style_callback_context: JsValue,
+    canvas_resized_callback: Option<js_sys::Function>,
 
     // Consumed when `run` is called
     input_events_rx: RefCell<Option<mpsc::UnboundedReceiver<RdpInputEvent>>>,
@@ -1126,6 +1133,11 @@ impl iron_remote_desktop::Session for Session {
                         if let Some((width, height)) = requested_resize {
                             gui.resize(width, height);
                             requested_resize = None;
+                            if let Some(callback) = &self.canvas_resized_callback {
+                                if let Err(error) = callback.call0(&JsValue::NULL) {
+                                    warn!(?error, "Canvas resized callback failed");
+                                }
+                            }
                         }
 
                         let mut connection_activation = activation_factory.create();
