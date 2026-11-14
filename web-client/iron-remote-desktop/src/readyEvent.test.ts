@@ -141,4 +141,23 @@ describe('ready event', () => {
 
         await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
     });
+
+    it('uses manual clipboard mode when the permission query is unsupported', async () => {
+        stubClipboardApi(() => Promise.reject(new TypeError('unsupported permission')));
+
+        const target = document.createElement('div');
+        document.body.appendChild(target);
+        const ready = vi.fn();
+        target.addEventListener('ready', ready);
+
+        component = mount(IronRemoteDesktop, {
+            target,
+            props: { scale: 'fit', verbose: 'false', flexcenter: 'true', module: createRecordingModule([]) },
+        });
+
+        await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
+        expect(navigator.clipboard.read).not.toHaveBeenCalled();
+        const ui = (ready.mock.calls[0][0] as CustomEvent).detail.irgUserInteraction;
+        expect(ui.supportsAutomaticClipboard()).toBe(false);
+    });
 });

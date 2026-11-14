@@ -76,6 +76,14 @@ export function legacyGraphics(enable: boolean): Extension {
     return new Extension('legacy_graphics', enable);
 }
 
+export function desktopScaleFactor(percentage: number): Extension {
+    return new Extension('desktop_scale_factor', percentage);
+}
+
+export function deviceScaleFactor(percentage: number): Extension {
+    return new Extension('device_scale_factor', percentage);
+}
+
 // --- RDCleanPath ---
 
 export { RDCleanPathErrorCode } from './RDCleanPathErrorCode';

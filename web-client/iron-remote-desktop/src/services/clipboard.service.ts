@@ -82,14 +82,13 @@ export class ClipboardService {
     }
 
     async initClipboard() {
-        // Clipboard API is available only in secure contexts (HTTPS).
+        // Automatic clipboard access requires a secure context; direct text transfers remain available.
         if (!window.isSecureContext) {
-            this.remoteDesktopService.emitWarningEvent('Clipboard is available only in secure contexts (HTTPS).');
-            return;
-        }
-
-        // Detect if browser supports async Clipboard API
-        if (navigator.clipboard != undefined) {
+            this.ClipboardApiSupported = ClipboardApiSupported.TextOnlyServerOnly;
+            this.remoteDesktopService.emitWarningEvent(
+                'Automatic clipboard synchronization is available only in secure contexts (HTTPS).',
+            );
+        } else if (navigator.clipboard != undefined) {
             if (navigator.clipboard.read != undefined && navigator.clipboard.write != undefined) {
                 this.ClipboardApiSupported = ClipboardApiSupported.Full;
             } else if (navigator.clipboard.readText != undefined) {
@@ -121,13 +120,9 @@ export class ClipboardService {
         //    include "clipboard-read" in its PermissionName WebIDL enum, so
         //    the query throws. Without persistent permission, Firefox requires
         //    transient user activation for every clipboard.read() call, making
-        //    the polling loop unusable. Downgrade to TextOnly so Firefox
-        //    routes through the text-only fallback paths.
-        //
-        //    When the permission query fails, a trial clipboard.read() checks
-        //    whether Firefox's `dom.events.testing.asyncClipboard` about:config
-        //    pref is active. If so, keep Full mode as clipboard works fully in
-        //    this scenario, without any user-activation restrictions.
+        //    the polling loop unusable. A trial read can remain pending while
+        //    waiting for activation, so downgrade directly instead of blocking
+        //    component initialization.
         if (this.ClipboardApiSupported === ClipboardApiSupported.Full) {
             try {
                 const permissionStatus = await navigator.permissions.query({
@@ -138,12 +133,7 @@ export class ClipboardService {
                     this.ClipboardApiSupported = ClipboardApiSupported.TextOnly;
                 }
             } catch {
-                try {
-                    // Try to read clipboard to check if the asyncClipboard pref is enabled
-                    await navigator.clipboard.read();
-                } catch {
-                    this.ClipboardApiSupported = ClipboardApiSupported.TextOnly;
-                }
+                this.ClipboardApiSupported = ClipboardApiSupported.TextOnly;
             }
         }
 
@@ -181,6 +171,10 @@ export class ClipboardService {
         } else {
             this.remoteDesktopService.setOnRemoteClipboardChanged(this.ffOnRemoteClipboardChanged.bind(this));
         }
+    }
+
+    supportsAutomaticClipboard(): boolean {
+        return this.ClipboardApiSupported === ClipboardApiSupported.Full;
     }
 
     // Copies clipboard content received from the server to the local clipboard.
@@ -247,6 +241,21 @@ export class ClipboardService {
             this.lastSentClipboardData = clipboardData;
             await this.remoteDesktopService.onClipboardChanged(clipboardData);
         }
+    }
+
+    async sendClipboardText(text: string): Promise<void> {
+        const clipboardData = new this.module.ClipboardData();
+        clipboardData.addText('text/plain', text);
+        this.lastSentClipboardData = clipboardData;
+        await this.remoteDesktopService.onClipboardChanged(clipboardData);
+    }
+
+    remoteClipboardText(): string {
+        if (this.ffClipboardDataToSave !== null) {
+            return this.ffClipboardDataToSave;
+        }
+        const value = this.lastReceivedClipboardData['text/plain'];
+        return typeof value === 'string' ? value : '';
     }
 
     private scheduleOnMonitorClipboardUpdate() {

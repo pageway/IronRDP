@@ -77,6 +77,10 @@ export class PublicAPI {
         this.remoteDesktopService.setEnableAutoClipboard(enable);
     }
 
+    private supportsAutomaticClipboard(): boolean {
+        return this.clipboardService.supportsAutomaticClipboard();
+    }
+
     private setOnWarningCallback(callback: (data: string) => void) {
         this.remoteDesktopService.setOnWarningCallback(callback);
     }
@@ -91,6 +95,14 @@ export class PublicAPI {
 
     private async sendClipboardData(): Promise<void> {
         return await this.clipboardService.sendClipboardData();
+    }
+
+    private async sendClipboardText(text: string): Promise<void> {
+        return await this.clipboardService.sendClipboardText(text);
+    }
+
+    private remoteClipboardText(): string {
+        return this.clipboardService.remoteClipboardText();
     }
 
     private invokeExtension(ext: Extension) {
@@ -131,8 +143,11 @@ export class PublicAPI {
             resize: this.resize.bind(this),
             setEnableClipboard: this.setEnableClipboard.bind(this),
             setEnableAutoClipboard: this.setEnableAutoClipboard.bind(this),
+            supportsAutomaticClipboard: this.supportsAutomaticClipboard.bind(this),
             saveRemoteClipboardData: this.saveRemoteClipboardData.bind(this),
             sendClipboardData: this.sendClipboardData.bind(this),
+            sendClipboardText: this.sendClipboardText.bind(this),
+            remoteClipboardText: this.remoteClipboardText.bind(this),
             invokeExtension: this.invokeExtension.bind(this),
             enableFileTransfer: this.enableFileTransfer.bind(this),
         };

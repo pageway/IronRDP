@@ -100,6 +100,8 @@ struct SessionBuilderInner {
     enable_standard_rdp_security: bool,
     enable_server_pointer: bool,
     legacy_graphics: bool,
+    desktop_scale_factor: u32,
+    device_scale_factor: Option<u32>,
     outbound_message_size_limit: Option<usize>,
 }
 
@@ -146,6 +148,8 @@ impl Default for SessionBuilderInner {
             enable_standard_rdp_security: false,
             enable_server_pointer: true,
             legacy_graphics: false,
+            desktop_scale_factor: 100,
+            device_scale_factor: Some(100),
             outbound_message_size_limit: None,
         }
     }
@@ -297,6 +301,20 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
             };
             |enable_server_pointer: bool| { self.0.borrow_mut().enable_server_pointer = enable_server_pointer };
             |legacy_graphics: bool| { self.0.borrow_mut().legacy_graphics = legacy_graphics };
+            |desktop_scale_factor: f64| {
+                if (100.0..=500.0).contains(&desktop_scale_factor) {
+                    self.0.borrow_mut().desktop_scale_factor = desktop_scale_factor as u32;
+                } else {
+                    warn!(desktop_scale_factor, "Invalid desktop_scale_factor");
+                }
+            };
+            |device_scale_factor: f64| {
+                if matches!(device_scale_factor, 100.0 | 140.0 | 180.0) {
+                    self.0.borrow_mut().device_scale_factor = Some(device_scale_factor as u32);
+                } else {
+                    warn!(device_scale_factor, "Invalid device_scale_factor");
+                }
+            };
             |outbound_message_size_limit: f64| {
                 let limit = if outbound_message_size_limit >= 0.0 && outbound_message_size_limit <= f64::from(u32::MAX) {
                     #[expect(clippy::as_conversions, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -476,8 +494,11 @@ impl iron_remote_desktop::SessionBuilder for SessionBuilder {
             security,
         );
 
-        let enable_server_pointer = self.0.borrow().enable_server_pointer;
-        config.enable_server_pointer = enable_server_pointer;
+        let inner = self.0.borrow();
+        config.enable_server_pointer = inner.enable_server_pointer;
+        config.desktop_scale_factor = inner.desktop_scale_factor;
+        config.device_scale_factor = inner.device_scale_factor;
+        drop(inner);
 
         let (input_events_tx, input_events_rx) = mpsc::unbounded();
 
@@ -1590,10 +1611,10 @@ fn build_config(
         support_dyn_vc_gfx_protocol: false,
         rdp_version: ironrdp::pdu::gcc::RdpVersion::V5_PLUS,
         performance_flags: PerformanceFlags::default(),
-        desktop_scale_factor: 0,
+        desktop_scale_factor: 100,
         desktop_physical_size: None,
         desktop_orientation: None,
-        device_scale_factor: None,
+        device_scale_factor: Some(100),
         monitor_extended_layout: None,
         relative_mouse_input: false,
         hardware_id: None,

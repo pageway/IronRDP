@@ -135,7 +135,11 @@
 
         remoteDesktopService.dynamicResizeObservable.subscribe((evt) => {
             loggingService.info(`Dynamic resize!, width: ${evt.width}, height: ${evt.height}`);
-            setViewerStyle(evt.height.toString() + 'px', evt.width.toString() + 'px', true);
+            setViewerStyle(
+                (evt.height / window.devicePixelRatio).toString() + 'px',
+                (evt.width / window.devicePixelRatio).toString() + 'px',
+                true,
+            );
         });
 
         remoteDesktopService.changeVisibilityObservable.subscribe((val) => {
@@ -234,21 +238,23 @@
     function realResize() {
         const windowSize = getWindowSize();
         const wrapperBoundingBox = wrapper.getBoundingClientRect();
+        const width = canvas.width / window.devicePixelRatio;
+        const height = canvas.height / window.devicePixelRatio;
 
         const containerWidth = windowSize.x - wrapperBoundingBox.x;
         const containerHeight = windowSize.y - wrapperBoundingBox.y;
 
-        if (containerWidth < canvas.width || containerHeight < canvas.height) {
+        if (containerWidth < width || containerHeight < height) {
             setWrapperStyle(
-                `${Math.min(containerHeight, canvas.height)}px`,
-                `${Math.min(containerWidth, canvas.width)}px`,
+                `${Math.min(containerHeight, height)}px`,
+                `${Math.min(containerWidth, width)}px`,
                 'auto',
             );
         } else {
             setWrapperStyle('initial', 'initial', 'initial');
         }
 
-        setViewerStyle(`${canvas.height}px`, `${canvas.width}px`, true);
+        setViewerStyle(`${height}px`, `${width}px`, true);
         setHostStyle(false);
     }
 

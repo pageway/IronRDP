@@ -39,9 +39,15 @@ export interface UserInteraction {
 
     setEnableAutoClipboard(enable: boolean): void;
 
+    supportsAutomaticClipboard(): boolean;
+
     saveRemoteClipboardData(): Promise<void>;
 
     sendClipboardData(): Promise<void>;
+
+    sendClipboardText(text: string): Promise<void>;
+
+    remoteClipboardText(): string;
 
     invokeExtension(ext: Extension): void;
 
